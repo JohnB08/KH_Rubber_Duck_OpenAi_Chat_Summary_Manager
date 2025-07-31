@@ -1,0 +1,6 @@
+@RubberDuckMCPServer_HostAddress = http://localhost:5932
+
+GET {{RubberDuckMCPServer_HostAddress}}/generate_chat_id/
+Accept: application/json
+
+###
