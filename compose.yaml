@@ -1,0 +1,11 @@
+﻿services:
+  rubberduckmcpserver:
+    image: rubberduckmcpserver
+    build:
+      context: .
+      dockerfile: RubberDuckMCPServer/Dockerfile
+    ports:
+      - "5932:8080"
+      - "5933:8081"
+    volumes:
+      - ./Data:/app/Data
