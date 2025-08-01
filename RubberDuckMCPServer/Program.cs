@@ -1,13 +1,25 @@
+
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
-using Microsoft.AspNetCore.Mvc;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using RubberDuckMCPServer.Models.Context;
 using RubberDuckMCPServer.Models.DTO;
 using RubberDuckMCPServer.Models.POCO;
 using RubberDuckMCPServer.Services;
+using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
+
+Log.Logger = new LoggerConfiguration()
+    .ReadFrom.Configuration(builder.Configuration)
+    .Enrich.FromLogContext()
+    .WriteTo.Console()
+    .WriteTo.File("./Log-.txt", rollingInterval:RollingInterval.Day)
+    .CreateLogger();
+
+builder.Host.UseSerilog();
 
 // Add services to the container.
 // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
@@ -28,29 +40,52 @@ app.UseHttpsRedirection();
 using (var scope = app.Services.CreateScope())
 {
     var dbConnection = scope.ServiceProvider.GetRequiredService<McpDbContext>();
-    try
+    var logger =  scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+    do
     {
-        var chatIds = dbConnection.ChatIds.Select(c => c.GeneratedChatId);
-        ChatIdService.LoadData(chatIds);
-    }
-    catch (SqliteException ex)
-    {
+        try
+        {
+            var chatIds = dbConnection.ChatIds.Select(c => c.GeneratedChatId);
+            ChatIdService.LoadData(chatIds);
+            var token = dbConnection.Tokens.FirstOrDefault();
+            if (token is null)
+            {
+                var tokendata = SHA256.HashData(Guid.NewGuid().ToByteArray());
+                var stringBuilder = new StringBuilder();
+                foreach (var data in tokendata)
+                {
+                    stringBuilder.Append(data.ToString("x2"));
+                }
+                var tokenString = stringBuilder.ToString();
+                await dbConnection.Tokens.AddAsync(new Token()
+                {
+                    OpenAiToken = tokenString,
+                });
+                await dbConnection.SaveChangesAsync();
+                TokenService.Token = tokenString;
+            }
+            else TokenService.Token = token.OpenAiToken;
+            logger.LogInformation("Token: {S}", TokenService.Token);
+        }
+        catch (SqliteException ex)
+        {
         
-        await dbConnection.Database.MigrateAsync();
-    }
+            await dbConnection.Database.MigrateAsync();
+        }
+    } while (TokenService.Token ==  string.Empty);
+    
 }
-
-var expected = builder.Configuration["ApiKey"];
 
 app.Use(async (context, next) =>
 {
     var authHeader = context.Request.Headers.Authorization;
-    if (authHeader != $"Bearer {expected}")
+    if (authHeader != $"Bearer {TokenService.Token}")
     {
         context.Response.StatusCode = 401;
         await context.Response.WriteAsync("Unauthorized");
+        return;
     }
-
+    
     await next();
 });
 
