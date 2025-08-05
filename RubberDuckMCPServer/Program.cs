@@ -37,6 +37,8 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
+app.UseStaticFiles();
+
 using (var scope = app.Services.CreateScope())
 {
     var dbConnection = scope.ServiceProvider.GetRequiredService<McpDbContext>();
