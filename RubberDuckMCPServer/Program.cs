@@ -137,10 +137,10 @@ app.MapGet("/chat_summary", async (Guid id, McpDbContext context) =>
     return rawJson is null ? Results.NotFound() : Results.Ok(JsonSerializer.Deserialize<ActionRequestBody>(rawJson.JsonBlob));
 });
 
-app.MapGet("/chat_history", async (Guid id, McpDbContext context) =>
+app.MapGet("/chat_history", async (Guid id, int amount, McpDbContext context) =>
 {
     return Results.Ok(await context.Chats.Include(c => c.ChatId).Where(c => c.ChatId.GeneratedChatId == id)
-        .OrderByDescending(c => c.Id).Take(10).ToListAsync());
+        .OrderByDescending(c => c.Id).Take(amount).ToListAsync());
 });
 
 app.Run();
